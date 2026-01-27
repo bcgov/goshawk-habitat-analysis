@@ -1,6 +1,6 @@
 # 
 # %%
-from goshawk_habitat.db.oracly import test_function
+from goshawk_habitat.db.oracle import test_function
 
 def main():
     test_function()
