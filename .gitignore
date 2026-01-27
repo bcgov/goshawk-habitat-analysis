@@ -1,3 +1,6 @@
+# Ignore a folder at the repo root/
+data/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
