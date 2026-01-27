@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "goshawk-occupancy-analysis"
+version = "0.0.1"
+description = "Python-based geospatial workflow to model breeding-season habitat suitability for Northern Goshawk across the Omineca. Produces nesting, foraging, and integrated breeding habitat layers to support inventory, cumulative effects analysis, GAR prioritization, and monitoring under FRPA."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+
+authors = [
+  { name = "Eric Millan" }
+]
+
+dependencies = [
+  # core
+  "numpy",
+  "pandas",
+
+  # geospatial
+  "shapely",
+  "pyproj",
+
+  # database
+  "oracledb"
+]
+
+[project.optional-dependencies]
+dev = [
+  "black",
+  "ruff",
+  "pytest",
+  "pytest-cov"
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
