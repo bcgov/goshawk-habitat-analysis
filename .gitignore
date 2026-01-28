@@ -1,4 +1,4 @@
-# Ignore a folder at the repo root/
+# Ignore a folder at the repo root
 data/
 
 # Byte-compiled / optimized / DLL files
