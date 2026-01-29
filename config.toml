@@ -1,0 +1,22 @@
+# -----------------------------------------------------------------------------
+# Goshawk Occupancy Analysis – Run Configuration
+#
+# This file defines high-level configuration parameters used to control
+# data extraction and analysis workflows, including which Natural Resource
+# District(s) to process, output locations, and other run-specific settings.
+#
+# Values in this file are intended to be modified between runs without
+# changing analysis code.
+# -----------------------------------------------------------------------------
+
+[district]
+code = "DPG"
+
+[vri_params]
+proj_age_1 = 100    # query includes values higher than this value 
+proj_height = 19.5  # query includes values higher than this value
+crown_closure = 26  # query includes values higher than this value
+site_index = 10     # Used in queries as ceiling / less than value
+
+[tsa]
+feature_id = 333     # 33 is the code for Robson Valley TSA in its entirety
