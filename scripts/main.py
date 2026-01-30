@@ -12,7 +12,6 @@ load_dotenv(ROOT / ".env")
 with open(ROOT / "config.toml", "rb") as f:
     cfg = tomllib.load(f)
 
-
 def main():
     conn = bcgw.connect()
     with bcgw.oracle_cursor(conn) as cur:
@@ -33,6 +32,7 @@ def main():
         "min_height": cfg["vri_params"]["proj_height"],
         "min_crown_closure": cfg["vri_params"]["crown_closure"],
         "max_site_index": cfg["vri_params"]["site_index"],
+        "tol":cfg["geoprocessing"]["tol"]
     }
 
     cols, rows = bcgw.run_sql(conn, "veg_comp_by_tsa.sql", params=params)

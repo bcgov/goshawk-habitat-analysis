@@ -20,3 +20,6 @@ site_index = 10     # Used in queries as ceiling / less than value
 
 [tsa]
 feature_id = 333     # 33 is the code for Robson Valley TSA in its entirety
+
+[geoprocessing]
+tol = 0.005
