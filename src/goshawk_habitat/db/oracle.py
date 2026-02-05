@@ -81,19 +81,11 @@ def load_sql(sql_filename: str) -> str:
 def run_sql(conn, sql_filename, params=None):
     sql_text = load_sql(sql_filename)  # however you're loading it
 
-    print("---- DEBUG run_sql ----")
-    print("sql_filename:", sql_filename)
-    print("contains :district_name?", ":district_name" in sql_text)
-    print("params keys:", list((params or {}).keys()))
-    print("first 500 chars of SQL:\n", sql_text[:500])
-    print("-----------------------")
-
     with conn.cursor() as cur:
         cur.execute(sql_text, params or {})
         rows = cur.fetchall()
         cols = [c[0] for c in cur.description]
     return cols, rows
-
 
 def run_sql_file(connection, sql_filename: str, params: dict | None = None):
     sql = load_sql(sql_filename)

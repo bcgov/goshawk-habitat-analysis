@@ -12,14 +12,18 @@
 [district]
 code = "DPG"
 
-[vri_params]
+[nesting_vri_params]
 proj_age_1 = 100    # query includes values higher than this value 
 proj_height = 19.5  # query includes values higher than this value
 crown_closure = 26  # query includes values higher than this value
 site_index = 10     # Used in queries as ceiling / less than value
 
+[foraging_vri_params]
+proj_age_1 = 40    # query includes values higher than this value 
+min_disturbance_year = 1986 # query includes values higher than this value 
+
 [tsa]
-feature_id = 333     # 33 is the code for Robson Valley TSA in its entirety
+feature_id = 367     # 333 is the code for Robson Valley TSA in its entirety
 
 [geoprocessing]
 tol = 0.005
