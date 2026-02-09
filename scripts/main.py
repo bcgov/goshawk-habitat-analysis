@@ -89,6 +89,17 @@ def generate_geojson(cols, rows, out_path):
 
     log_event(f"Wrote {len(features):,} features to {out_path}")
 
+def _log_raster_stats(path: Path, label: str) -> None:
+    with rasterio.open(path) as src:
+        arr = src.read(1)
+        vals, counts = np.unique(arr, return_counts=True)
+        unique_vals = dict(zip(vals.tolist(), counts.tolist()))
+        log_event(
+            f"{label} – dtype={arr.dtype}, nodata={src.nodata}, "
+            f"min/max={arr.min()}/{arr.max()}, unique values: "
+            f"{', '.join(f'{k}: {v:,}' for k, v in unique_vals.items())}"
+        )
+
 def main():
     # Establish Connection to the BCGW and Confirm Successful Connection
     log_event("Creating Connection")
@@ -106,6 +117,11 @@ def main():
 
     # Import Parameters from Config File
     log_event("Importing Configuration Parameters")
+    
+    tsa_params = {
+        "tsa_id": cfg["tsa"]["feature_id"]
+    }
+    
     nest_params = {
         "tsa_id": cfg["tsa"]["feature_id"],
         "min_age": cfg["nesting_vri_params"]["proj_age_1"],
@@ -128,64 +144,89 @@ def main():
         "min_age": cfg["foraging_vri_params"]["proj_age_1"],
     }
 
-#     # Nesting Geojson Generation
-#     log_event(f"Running Nesting SQL Query for TSA {nest_params['tsa_id']}")
-#     cols, rows = bcgw.run_sql(conn, "nesting.sql", params=nest_params)  
+    r_cfg = cfg["raster"]
 
-#     log_event(f"Creating Nesting GeoJson for TSA {nest_params['tsa_id']}")
-#     geojson_out_path = ROOT / "data" / f"nesting_{cfg['tsa']['feature_id']}.geojson"
-#     geojson_out_path.parent.mkdir(parents=True, exist_ok=True)
-#     generate_geojson(cols, rows, geojson_out_path)
+    grid_cfg = raster.GridConfig(
+        out_crs=r_cfg["out_crs"],
+        pixel_size=float(r_cfg["pixel_size"]),
+        all_touched=bool(r_cfg.get("all_touched", False)),
+        nodata=int(r_cfg.get("nodata", 255)),
+        dtype=str(r_cfg.get("dtype", "uint8")),
+        compress=str(r_cfg.get("compress", "DEFLATE")),
+        tiled=bool(r_cfg.get("tiled", True)),
+        blockxsize=int(r_cfg.get("blockxsize", 256)),
+        blockysize=int(r_cfg.get("blockysize", 256)),
+        predictor=r_cfg.get("predictor", 2),
+    )
 
-#     log_event(f"Creating Nesting TIF for TSA {nest_params['tsa_id']}")
-#     nest_raster_out_path = ROOT / "data" / f"nest_raster_{cfg['tsa']['feature_id']}.tif"
-#     nest_raster_out_path.parent.mkdir(parents=True, exist_ok=True)
-#     raster.rasterize_geojson_to_30m(geojson_out_path, nest_raster_out_path)
-#     with rasterio.open(nest_raster_out_path) as src:
-#         arr = src.read(1)
-#         print("dtype:", arr.dtype)
-#         print("nodata:", src.nodata)
-#         print("min/max:", arr.min(), arr.max())
-#         vals, counts = np.unique(arr, return_counts=True)
-#         unique_vals = dict(zip(vals.tolist(), counts.tolist()))
-#         log_event(
-#             f"Nesting TIF Created – unique values: "
-#             f"{', '.join(f'{k}: {v:,}' for k, v in unique_vals.items())}"
-# )
+    # -------------------------
+    # TSA GeoJSON Creation and Grid Creation
+    # -------------------------
+    log_event(f"Running TSA SQL Query for TSA {tsa_params['tsa_id']}")
+    cols, rows = bcgw.run_sql(conn, "TSA.sql", params=tsa_params)
 
-#     # Foraging Geojson Generation
-#     log_event(f"Running Foraging SQL Query for TSA {forage_params['tsa_id']}")
-#     cols, rows = bcgw.run_sql(conn, "foraging.sql", params=forage_params)  
+    log_event(f"Creating TSA GeoJSON for TSA {tsa_params['tsa_id']}")
+    tsa_geojson_path = ROOT / "data" / f"tsa_{cfg['tsa']['feature_id']}.geojson"
+    generate_geojson(cols, rows, tsa_geojson_path)
 
-#     log_event(f"Creating Foraging GeoJson for TSA {forage_params['tsa_id']}")
-#     geojson_out_path = ROOT / "data" / f"foraging_{cfg['tsa']['feature_id']}.geojson"
-#     geojson_out_path.parent.mkdir(parents=True, exist_ok=True)
-#     generate_geojson(cols, rows, geojson_out_path)
+    # Create the canonical grid (this is what makes all rasters align)
+    log_event("Creating canonical RasterGrid from TSA GeoJSON")
+    grid = raster.RasterGrid.from_geojson_aoi(
+        aoi_geojson_path=tsa_geojson_path,
+        config=grid_cfg,  # <-- THIS MUST BE GridConfig, not dict
+        aoi_crs_if_missing=r_cfg.get("geojson_crs_if_missing", "EPSG:4326"),
+        pad_pixels=int(r_cfg.get("pad_pixels", 0)),
+    )
 
-#     log_event(f"Creating Foraging TIF for TSA {forage_params['tsa_id']}")
-#     forage_raster_out_path = ROOT / "data" / f"forage_raster_{cfg['tsa']['feature_id']}.tif"
-#     forage_raster_out_path.parent.mkdir(parents=True, exist_ok=True)
-#     raster.rasterize_geojson_to_30m_age_classes(geojson_out_path, forage_raster_out_path)
-#     with rasterio.open(forage_raster_out_path) as src:
-#         arr = src.read(1)
-#         print("dtype:", arr.dtype)
-#         print("nodata:", src.nodata)
-#         print("min/max:", arr.min(), arr.max())
-#         vals, counts = np.unique(arr, return_counts=True)
-#         unique_vals = dict(zip(vals.tolist(), counts.tolist()))
-#         log_event(
-#             f"Foraging TIF Created – unique values: "
-#             f"{', '.join(f'{k}: {v:,}' for k, v in unique_vals.items())}"
-# )
+    log_event(
+        f"Grid created – CRS={grid.crs}, pixel={grid.pixel_size}, "
+        f"origin=({grid.extent.xmin}, {grid.extent.ymax}), size={grid.width}x{grid.height}"
+    )
 
-    # Nesting Geojson Generation
-    log_event(f"Running Data Prep SQL Query for TSA {data_prep_params['tsa_id']}")
-    cols, rows = bcgw.run_sql(conn, "data_prep.sql", params=data_prep_params)  
+    # -------------------------
+    # Nesting GeoJSON + raster (ALIGNED)
+    # -------------------------
+    log_event(f"Running Nesting SQL Query for TSA {nest_params['tsa_id']}")
+    cols, rows = bcgw.run_sql(conn, "nesting.sql", params=nest_params)
 
-    log_event(f"Creating VRI GeoJson for TSA {nest_params['tsa_id']}")
-    geojson_out_path = ROOT / "data" / f"vri_{cfg['tsa']['feature_id']}.geojson"
-    geojson_out_path.parent.mkdir(parents=True, exist_ok=True)
-    generate_geojson(cols, rows, geojson_out_path)
+    log_event(f"Creating Nesting GeoJSON for TSA {nest_params['tsa_id']}")
+    nesting_geojson_path = ROOT / "data" / f"nesting_{nest_params['tsa_id']}.geojson"
+    generate_geojson(cols, rows, nesting_geojson_path)
+
+    log_event(f"Creating Nesting TIF for TSA {nest_params['tsa_id']} (aligned to canonical grid)")
+    nest_raster_out_path = ROOT / "data" / f"nest_raster_{nest_params['tsa_id']}.tif"
+    grid.rasterize_geojson_binary(
+        geojson_path=nesting_geojson_path,
+        out_tif_path=nest_raster_out_path,
+        geojson_crs_if_missing=r_cfg.get("geojson_crs_if_missing", "EPSG:4326"),
+        burn_value=1,
+    )
+    _log_raster_stats(nest_raster_out_path, "Nesting TIF Created")
+
+    # -------------------------
+    # Foraging GeoJSON + raster (ALIGNED)
+    # -------------------------
+    log_event(f"Running Foraging SQL Query for TSA {forage_params['tsa_id']}")
+    cols, rows = bcgw.run_sql(conn, "foraging_2.sql", params=forage_params)
+
+    log_event(f"Creating Foraging GeoJSON for TSA {forage_params['tsa_id']}")
+    foraging_geojson_path = ROOT / "data" / f"foraging_{forage_params['tsa_id']}.geojson"
+    generate_geojson(cols, rows, foraging_geojson_path)
+
+    log_event(f"Creating Foraging TIF for TSA {forage_params['tsa_id']} (aligned to canonical grid)")
+    forage_raster_out_path = ROOT / "data" / f"forage_raster_{forage_params['tsa_id']}.tif"
+    grid.rasterize_geojson_age_classes(
+        geojson_path=foraging_geojson_path,
+        out_tif_path=forage_raster_out_path,
+        age_field="PROJ_AGE_1",
+        geojson_crs_if_missing=r_cfg.get("geojson_crs_if_missing", "EPSG:4326"),
+        # If you're using nodata=255 (recommended for ArcGIS when 0 is a valid class),
+        # keep it in config.toml as raster.nodata=255 and you can omit these:
+        nodata=int(r_cfg.get("forage_nodata", grid_cfg.nodata)),
+        dtype=str(r_cfg.get("forage_dtype", grid_cfg.dtype)),
+    )
+    _log_raster_stats(forage_raster_out_path, "Foraging TIF Created")
+
 
 
 # %%
