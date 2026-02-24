@@ -23,10 +23,11 @@ proj_age_1 = 40    # query includes values higher than this value
 min_disturbance_year = 1986 # query includes values higher than this value 
 
 [tsa]
-feature_id = 365     # 333 is the code for Robson Valley TSA in its entirety
+feature_id = 333     # 333 is the code for Robson Valley TSA in its entirety
+# [363, 364, 365, 366, 377, 368, 369, 370, 371, 372] Full list of Blocks that will get most of the way
 
 [geoprocessing]
-tol = 0.005
+tol = 1
 
 [raster]
 out_crs = "EPSG:3005" #BC Albers

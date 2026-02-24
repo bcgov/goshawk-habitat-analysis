@@ -1,0 +1,3 @@
+SELECT cb.shape
+FROM WHSE_FOREST_VEGETATION.VEG_CONSOLIDATED_CUT_BLOCKS_SP cb
+WHERE cb.harvest_start_year_calendar > 1946
