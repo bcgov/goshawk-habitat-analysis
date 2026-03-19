@@ -118,6 +118,7 @@ def main():
     # Import Parameters from Config File
     log_event("Importing Configuration Parameters")
     
+
     tsa_params = {
         "tsa_id": cfg["tsa"]["feature_id"]
     }
@@ -185,41 +186,6 @@ def main():
     )
 
     # # -------------------------
-    # # Data Prep of Geojson
-    # # -------------------------
-    # # Get VRI Data
-    # log_event(f"Running Data Prep SQL Query for TSA {data_prep_params['tsa_id']}")
-    # cols, rows = bcgw.run_sql(conn, "data_prep.sql", params=data_prep_params)
-
-    # log_event(f"Creating Data Prep GeoJSON for TSA {data_prep_params['tsa_id']}")
-    # dataprep_geojson_path = ROOT / "data" / f"dataprep_{data_prep_params['tsa_id']}.geojson"
-    # generate_geojson(cols, rows, dataprep_geojson_path)
-
-    # # Get Fire Data (Historic)
-    # log_event(f"Running Historic Fire SQL Query for TSA {data_prep_params['tsa_id']}")
-    # cols, rows = bcgw.run_sql(conn, "Nesting_Historic_Fire.sql", params=data_prep_params)
-
-    # log_event(f"Creating Historic Fire GeoJSON for TSA {data_prep_params['tsa_id']}")
-    # NestingHistoricFire_geojson_path = ROOT / "data" / f"NestingHistoricFire_{data_prep_params['tsa_id']}.geojson"
-    # generate_geojson(cols, rows, NestingHistoricFire_geojson_path)
-
-    # # Get Fire Data (Current)
-    # log_event(f"Running Current Fire SQL Query for TSA {data_prep_params['tsa_id']}")
-    # cols, rows = bcgw.run_sql(conn, "Nesting_Current_Fire.sql", params=data_prep_params)
-
-    # log_event(f"Creating Current Fire GeoJSON for TSA {data_prep_params['tsa_id']}")
-    # NestingCurrentFire_geojson_path = ROOT / "data" / f"NestingCurrentFire_{data_prep_params['tsa_id']}.geojson"
-    # generate_geojson(cols, rows, NestingCurrentFire_geojson_path)
-
-    # # Get Cutblock Data (Current)
-    # log_event(f"Running Cutblock SQL Query for TSA {data_prep_params['tsa_id']}")
-    # cols, rows = bcgw.run_sql(conn, "Nesting_Consolidated_Cutblocks_Fire.sql", params=data_prep_params)
-
-    # log_event(f"Creating Cutblock Fire GeoJSON for TSA {data_prep_params['tsa_id']}")
-    # NestingCutblock_geojson_path = ROOT / "data" / f"NestingCutblock_{data_prep_params['tsa_id']}.geojson"
-    # generate_geojson(cols, rows, NestingCutblock_geojson_path)
-
-    # # -------------------------
     # # Nesting GeoJSON + raster (ALIGNED)
     # # -------------------------
     # log_event(f"Running Nesting SQL Query for TSA {nest_params['tsa_id']}")
@@ -229,8 +195,7 @@ def main():
     # nesting_geojson_path = ROOT / "data" / f"nesting_{nest_params['tsa_id']}.geojson"
     # generate_geojson(cols, rows, nesting_geojson_path)
 
-    nesting_geojson_path = ROOT / "data" / "robson_nesting_modelbuilder.geojson"
-
+    nesting_geojson_path = ROOT / "data" / "Nesting_Modelbuilder.geojson"
     log_event(f"Creating Nesting TIF for TSA {nest_params['tsa_id']} (aligned to canonical grid)")
     nest_raster_out_path = ROOT / "data" / f"nest_raster_{nest_params['tsa_id']}.tif"
     grid.rasterize_geojson_binary(
@@ -241,17 +206,18 @@ def main():
     )
     _log_raster_stats(nest_raster_out_path, "Nesting TIF Created")
 
-    # # -------------------------
-    # # Foraging GeoJSON + raster (ALIGNED)
-    # # -------------------------
-    # log_event(f"Running Foraging SQL Query for TSA {forage_params['tsa_id']}")
-    # cols, rows = bcgw.run_sql(conn, "foraging_2.sql", params=forage_params)
 
-    # log_event(f"Creating Foraging GeoJSON for TSA {forage_params['tsa_id']}")
-    # foraging_geojson_path = ROOT / "data" / f"foraging_{forage_params['tsa_id']}.geojson"
-    # generate_geojson(cols, rows, foraging_geojson_path)
+    # -------------------------
+    # Foraging GeoJSON + raster (ALIGNED)
+    # -------------------------
+    # # log_event(f"Running Foraging SQL Query for TSA {forage_params['tsa_id']}")
+    # # cols, rows = bcgw.run_sql(conn, "foraging_2.sql", params=forage_params)
 
-    foraging_geojson_path = ROOT / "data" / "robson_foraging_modelbuilder.geojson"
+    # # log_event(f"Creating Foraging GeoJSON for TSA {forage_params['tsa_id']}")
+    # # foraging_geojson_path = ROOT / "data" / f"foraging_{forage_params['tsa_id']}.geojson"
+    # # generate_geojson(cols, rows, foraging_geojson_path)
+
+    foraging_geojson_path = ROOT / "data" / "Foraging_Modelbuilder.geojson"
 
 
     log_event(f"Creating Foraging TIF for TSA {forage_params['tsa_id']} (aligned to canonical grid)")
