@@ -12,11 +12,26 @@
 [district]
 code = "DPG"
 
+[vri_params]
+vri_cols = [
+    "PROJ_AGE_1", "PROJ_HEIGHT_1", "CROWN_CLOSURE",
+    "SITE_INDEX", "BEC_ZONE_CODE", "BEC_SUBZONE"
+]
+
+[cutblock_params]
+cutblock_columns = ["HARVEST_START_YEAR_CALENDAR"]
+geometry_f = "SHAPE"
+
 [nesting_vri_params]
 proj_age_1 = 100    # query includes values higher than this value 
 proj_height = 19.5  # query includes values higher than this value
 crown_closure = 26  # query includes values higher than this value
 site_index = 10     # Used in queries as ceiling / less than value
+bec_zone_code = "ESSF" # Used as part of 'exclusion' query
+bec_subzone_codes = ["mmp", "wcp"] # Used as part of 'exclusion' query
+cutblock_year = 1946
+fire_year = 1946
+
 
 [foraging_vri_params]
 proj_age_1 = 40    # query includes values higher than this value 
@@ -24,6 +39,8 @@ min_disturbance_year = 1986 # query includes values higher than this value
 
 [tsa]
 feature_id = 363     # 333 is the code for Robson Valley TSA in its entirety
+buffer_dist = 3000
+geometry_f = "GEOMETRY"
 # [363, 364, 365, 366, 377, 368, 369, 370, 371, 372] Full list of Blocks that will get most of the way
 
 [geoprocessing]

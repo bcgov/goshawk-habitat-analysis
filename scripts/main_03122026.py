@@ -20,8 +20,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------------------
 
-
-
 # %% 1. Configuration -------------------------------------------------------------
 def load_config(config_path: str = "config.toml") -> dict:
     """
@@ -110,20 +108,18 @@ engine = build_engine(PROJECT_ROOT)
 
 # %% 3. Source Layers ----------------------------------------------------------
 # 3a: Timber Supply Area & Buffer - Select Single TSA of Interest
+log_ram("before AOI fetch")
 tsa_id = str(cfg["tsa"]["feature_id"])
-tsa_all = read_bcgw_table(engine, "WHSE_ADMIN_BOUNDARIES.FADM_TSA", where=f"FEATURE_ID = '{tsa_id}'",geom_field="GEOMETRY")
-aoi_buffer = tsa_all.copy()
-aoi_buffer["geometry"] = tsa_all.buffer(3000)
-minx, miny, maxx, maxy = aoi_buffer.total_bounds
+buffer_dist = int(cfg["tsa"]["buffer_dist"])
+tsa_geom_field = str(cfg["tsa"]["geometry_f"])
 
+tsa_all = read_bcgw_table(engine, "WHSE_ADMIN_BOUNDARIES.FADM_TSA", where=f"FEATURE_ID = '{tsa_id}'",geom_field=tsa_geom_field)
+aoi_buffer = tsa_all.copy()
+aoi_buffer["geometry"] = tsa_all.buffer(buffer_dist)
+minx, miny, maxx, maxy = aoi_buffer.total_bounds
+log_ram("after AOI fetch")
 
 # 3b: VRI – large table; Filter applied server-side with the buffered AOI bbox
-# (full spatial clip done in Python after load)
-vri_cols = [
-    "PROJ_AGE_1", "PROJ_HEIGHT_1", "CROWN_CLOSURE",
-    "SITE_INDEX", "BEC_ZONE_CODE", "BEC_SUBZONE"
-]
-
 log_ram("before VRI fetch")
 vri = read_bcgw_table(
     engine,
@@ -135,7 +131,7 @@ vri = read_bcgw_table(
             SDO_ELEM_INFO_ARRAY(1, 1003, 3),
             SDO_ORDINATE_ARRAY({minx}, {miny}, {maxx}, {maxy})
         )
-    ) = 'TRUE'""", columns=vri_cols,
+    ) = 'TRUE'""", columns=cfg["vri_params"]["vri_cols"],
     geom_field="GEOMETRY"
 )
 log_ram("after VRI fetch")
@@ -150,11 +146,7 @@ log_ram("after del vri")
 
 
 # %% Dissolve and Consolidate VRI DATA -----------------------------------------
-dissolve_fields = [
-    "PROJ_AGE_1", "PROJ_HEIGHT_1", "CROWN_CLOSURE",
-    "SITE_INDEX", "BEC_ZONE_CODE", "BEC_SUBZONE"
-]
-# Only dissolve on fields that actually came back from the query
+dissolve_fields = cfg["vri_params"]["vri_cols"]
 dissolve_fields = [f.lower() for f in dissolve_fields if f.lower() in vri_clipped.columns]
 
 logger.info("Dissolving VRI by stand attributes...")
@@ -184,8 +176,8 @@ cutblocks = read_bcgw_table(
             SDO_ORDINATE_ARRAY({minx}, {miny}, {maxx}, {maxy})
         )
     ) = 'TRUE'""",
-    columns=["HARVEST_START_YEAR_CALENDAR"],
-    geom_field="SHAPE"
+    columns=cfg["cutblock_params"]["cutblock_columns"],
+    geom_field=cfg["cutblock_params"]["geometry_f"]
 )
 
 historic_fires = read_bcgw_table(
@@ -220,35 +212,33 @@ log_ram("after loading fire/cutblock layers")
 
 # %% Nesting Workflow-----------------------------------------------------------
 vri_nesting = vri_dissolved[
-    (vri_dissolved["proj_age_1"]    >= 100) &
-    (vri_dissolved["proj_height_1"] >= 19.5) &
-    (vri_dissolved["crown_closure"] >= 26) &
-    (vri_dissolved["site_index"]    >  10)
+    (vri_dissolved["proj_age_1"]    >= int(cfg["nesting_vri_params"]["proj_age_1"])) &
+    (vri_dissolved["proj_height_1"] >= int(cfg["nesting_vri_params"]["proj_height"])) &
+    (vri_dissolved["crown_closure"] >= int(cfg["nesting_vri_params"]["crown_closure"])) &
+    (vri_dissolved["site_index"]    >  int(cfg["nesting_vri_params"]["site_index"]))
 ].copy()
 logger.info(f"Nesting candidates: {len(vri_nesting)} features")
 
 # ESSF-mmp/wcp exclusion
-# Mirrors ArcGIS Select "REMOVE ESSF-MMP/WCP"
 essf_filter = vri_nesting[
-    (vri_nesting["bec_zone_code"] == "ESSF") &
-    (vri_nesting["bec_subzone"].isin(["mmp", "wcp"]))
+    (vri_nesting["bec_zone_code"] == cfg["nesting_vri_params"]["bec_zone_code"]) &
+    (vri_nesting["bec_subzone"].isin(cfg["nesting_vri_params"]["bec_subzone_codes"]))
 ].copy()
 logger.info(f"ESSF exclusion filter: {len(essf_filter)} features")
 
 # Cutblocks harvested since 1946
 filter_cutblocks_nesting = cutblocks[
-    cutblocks["harvest_start_year_calendar"] >= 1946
+    cutblocks["harvest_start_year_calendar"] >= int(cfg["nesting_vri_params"]["cutblock_year"])
 ].copy()
 logger.info(f"Cutblock filter (>=1946): {len(filter_cutblocks_nesting)} features")
 
 # Historic fires since 1946
 filter_fires_nesting = historic_fires[
-    historic_fires["fire_year"] >= 1946
+    historic_fires["fire_year"] >= int(cfg["nesting_vri_params"]["fire_year"])
 ].copy()
 logger.info(f"Historic fire filter (>=1946): {len(filter_fires_nesting)} features")
 
 # Merge all exclusion layers
-# Mirrors ArcGIS Merge
 filter_nesting = gpd.GeoDataFrame(
     pd.concat(
         [current_fires, essf_filter, filter_cutblocks_nesting, filter_fires_nesting],
@@ -260,7 +250,6 @@ filter_nesting = gpd.GeoDataFrame(
 logger.info(f"Combined nesting exclusion filter: {len(filter_nesting)} features")
 
 # Erase exclusion areas from nesting candidates
-# Mirrors ArcGIS PairwiseErase
 logger.info("Erasing exclusion areas from nesting polygons...")
 t0 = time.perf_counter()
 nesting_polygons = gpd.overlay(vri_nesting, filter_nesting,
@@ -270,7 +259,6 @@ logger.info(f"Nesting polygons after erase: {len(nesting_polygons)} in {time.per
 log_ram("after nesting erase")
 
 # Dissolve remaining nesting polygons
-# Mirrors ArcGIS PairwiseDissolve "Dissolve Remaining Features"
 nesting_dissolved = (
     nesting_polygons
     .dissolve(as_index=False)
@@ -279,16 +267,15 @@ nesting_dissolved = (
 )
 logger.info(f"Nesting dissolved: {len(nesting_dissolved)} features")
 
-# Export nesting GeoJSON (WGS84)
-# Mirrors ArcGIS FeaturesToJSON
-nesting_out = PROJECT_ROOT / "Nesting_Modelbuilder.geojson"
-nesting_dissolved.to_crs("EPSG:4326").to_file(nesting_out, driver="GeoJSON")
-logger.info(f"Nesting GeoJSON exported → {nesting_out}")
-
 
 
 
 # %% Mapping VRI Data - TEST
+# Export nesting GeoJSON (WGS84)
+nesting_out = PROJECT_ROOT / f"Nesting_Model_{tsa_id}.geojson"
+nesting_dissolved.to_crs("EPSG:4326").to_file(nesting_out, driver="GeoJSON")
+logger.info(f"Nesting GeoJSON exported → {nesting_out}")
+
 # Define 50-year bins
 bins = [0, 50, 100, 150, 200, 250, 300, np.inf]
 labels = ["0–50", "51–100", "101–150", "151–200", "201–250", "251–300", "300+"]
